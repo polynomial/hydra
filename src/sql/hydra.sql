@@ -393,6 +393,15 @@ create table CachedBazaarInputs (
     primary key   (uri, revision)
 );
 
+create table CachedGitRefInputs (
+    uri           text not null,
+    ref           text not null,
+    revision      text not null,
+    sha256hash    text not null,
+    storePath     text not null,
+    primary key   (uri, branch, revision)
+);
+
 create table CachedGitInputs (
     uri           text not null,
     branch        text not null,

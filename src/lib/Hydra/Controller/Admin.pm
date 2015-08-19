@@ -54,6 +54,7 @@ sub clearvcscache : Chained('admin') PathPart('clear-vcs-cache') Args(0) {
     my ($self, $c) = @_;
     $c->model('DB::CachedPathInputs')->delete;
     $c->model('DB::CachedGitInputs')->delete;
+    $c->model('DB::CachedGitRefInputs')->delete;
     $c->model('DB::CachedSubversionInputs')->delete;
     $c->model('DB::CachedBazaarInputs')->delete;
     $c->flash->{successMsg} = "VCS caches have been cleared.";
