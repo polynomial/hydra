@@ -395,11 +395,11 @@ create table CachedBazaarInputs (
 
 create table CachedGitInputs (
     uri           text not null,
-    branch        text not null,
+    ref           text not null,
     revision      text not null,
     sha256hash    text not null,
     storePath     text not null,
-    primary key   (uri, branch, revision)
+    primary key   (uri, ref, revision)
 );
 
 create table CachedDarcsInputs (
@@ -649,7 +649,7 @@ create index IndexBuildsOnFinishedStopTime on Builds(finished, stoptime DESC);
 create index IndexBuildsOnJobFinishedId on builds(project, jobset, job, system, finished, id DESC);
 create index IndexBuildsOnDrvPath on Builds(drvPath);
 create index IndexCachedHgInputsOnHash on CachedHgInputs(uri, branch, sha256hash);
-create index IndexCachedGitInputsOnHash on CachedGitInputs(uri, branch, sha256hash);
+create index IndexCachedGitInputsOnHash on CachedGitInputs(uri, ref, sha256hash);
 create index IndexCachedSubversionInputsOnUriRevision on CachedSubversionInputs(uri, revision);
 create index IndexCachedBazaarInputsOnUriRevision on CachedBazaarInputs(uri, revision);
 create index IndexJobsetEvalMembersOnBuild on JobsetEvalMembers(build);
