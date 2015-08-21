@@ -1,4 +1,8 @@
-{ config, pkgs, lib ? pkgs.lib, ... }:
+{ config
+, pkgs
+, lib ? pkgs.lib
+, lookout ? import <lookout> {}
+, ... }:
 
 with lib;
 
@@ -178,7 +182,7 @@ in
 
     nix.trustedUsers = [ "hydra-queue-runner" ];
 
-    services.hydra.package = mkDefault ((import ./release.nix {}).build.x86_64-linux);
+    services.hydra.package = lookout.hydra
 
     services.hydra.extraConfig =
       ''
