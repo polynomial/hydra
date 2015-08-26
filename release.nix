@@ -1,5 +1,9 @@
 { hydraSrc ? { outPath = ./.; revCount = 1234; gitTag = "abcdef"; }
 , officialRelease ? false
+, pkgs
+, system
+, lib
+, utils
 }:
 
 let
