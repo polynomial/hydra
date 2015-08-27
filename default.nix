@@ -7,11 +7,11 @@ let
   name = "hydra";
   version = "1.2.3";
   gitCommit = "b528f881f09eca94797f711880d662913eee953d";
-  gitSha = "3c87ac06ce55116f20c345b54dd99fd6aac13e61251d6490b26d0ef87c9a8040";
+  gitSha = "0qzxqpwqijpjwryl5c39nsdcrzpk1nfqsqcf5k28bmjc8yhpvzv5";
   nix = pkgs.nixUnstable;
 in
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation  {
   name = "${name}-${version}";
   version = version;
 
@@ -33,56 +33,54 @@ stdenv.mkDerivation rec {
     };
   };
 
-  hydraPerlPkgs = pkgs.buildEnv {
-    name = "hydra-perl-packages";
-    paths = with pkgs.perlPackages; [
-      ModulePluggable
-      CatalystActionREST
-      CatalystAuthenticationStoreDBIxClass
-      CatalystDevel
-      CatalystDispatchTypeRegex
-      CatalystPluginAccessLog
-      CatalystPluginAuthorizationRoles
-      CatalystPluginCaptcha
-      CatalystPluginSessionStateCookie
-      CatalystPluginSessionStoreFastMmap
-      CatalystPluginStackTrace
-      CatalystPluginUnicodeEncoding
-      CatalystTraitForRequestProxyBase
-      CatalystViewDownload
-      CatalystViewJSON
-      CatalystViewTT
-      CatalystXScriptServerStarman
-      CryptRandPasswd
-      DBDPg
-      DBDSQLite
-      DataDump
-      DateTime
-      DigestSHA1
-      EmailMIME
-      EmailSender
-      FileSlurp
-      IOCompress
-      IPCRun
-      JSONXS
-      LWP
-      LWPProtocolHttps
-      NetAmazonS3
-      NetStatsd
-      PadWalker
-      Readonly
-      SQLSplitStatement
-      SetScalar
-      Starman
-      SysHostnameLong
-      TestMore
-      TextDiff
-      TextTable
-      XMLSimple
-      nix git
-    ];
-  };
+  #hydraPerlPkgs = with pkgs.perlPackages; [
   buildInputs = with pkgs; [
+     perlPackages.ModulePluggable
+     perlPackages.CatalystActionREST
+     perlPackages.CatalystAuthenticationStoreDBIxClass
+     perlPackages.CatalystDevel
+     perlPackages.CatalystDispatchTypeRegex
+     perlPackages.CatalystPluginAccessLog
+     perlPackages.CatalystPluginAuthorizationRoles
+     perlPackages.CatalystPluginCaptcha
+     perlPackages.CatalystPluginSessionStateCookie
+     perlPackages.CatalystPluginSessionStoreFastMmap
+     perlPackages.CatalystPluginStackTrace
+     perlPackages.CatalystPluginUnicodeEncoding
+     perlPackages.CatalystTraitForRequestProxyBase
+     perlPackages.CatalystViewDownload
+     perlPackages.CatalystViewJSON
+     perlPackages.CatalystViewTT
+     perlPackages.CatalystXScriptServerStarman
+     perlPackages.CryptRandPasswd
+     perlPackages.DBDPg
+     perlPackages.DBDSQLite
+     perlPackages.DataDump
+     perlPackages.DateTime
+     perlPackages.DigestSHA1
+     perlPackages.EmailMIME
+     perlPackages.EmailSender
+     perlPackages.FileSlurp
+     perlPackages.IOCompress
+     perlPackages.IPCRun
+     perlPackages.JSONXS
+     perlPackages.LWP
+     perlPackages.LWPProtocolHttps
+     perlPackages.NetAmazonS3
+     perlPackages.PadWalker
+     perlPackages.Readonly
+     perlPackages.SQLSplitStatement
+     perlPackages.SetScalar
+     perlPackages.Starman
+     perlPackages.SysHostnameLong
+     perlPackages.TestMore
+     perlPackages.TextDiff
+     perlPackages.TextTable
+     perlPackages.XMLSimple
+      #nix
+      #git
+    #];
+    #NetStatsd
     makeWrapper
     libtool
     unzip
@@ -98,8 +96,7 @@ stdenv.mkDerivation rec {
     openssl
     bzip2
     guile
-    hydraPerlPkgs
-  ];
+  ]; # ++ hydraPerlPkgs;
   hydraPath = pkgs.lib.makeSearchPath "bin" ( with pkgs; [
     libxslt
     sqlite
@@ -113,7 +110,7 @@ stdenv.mkDerivation rec {
     lzma
     gnutar
     unzip
-    git
+    #git
     gitAndTools.topGit
     mercurial
     darcs
@@ -121,6 +118,9 @@ stdenv.mkDerivation rec {
     bazaar
   ] ++ lib.optionals stdenv.isLinux [ rpm dpkg cdrkit ] );
   buildPhase = ''
+    set -x
+    pwd
+    mkdir -p "$out"
     cp -r * "$out"
     patchShebangs .
     for i in $out/bin/*; do
