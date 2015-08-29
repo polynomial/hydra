@@ -23,6 +23,7 @@ sub _getRefs {
     my ($self, $uri, $refPattern) = @_;
     my $refs = grab(cmd => ["git", "ls-remote", $uri, $refPattern]);
     die "error fetching remote refs: $refPattern from: $uri\n" unless $refs =~ /[0-9a-fA-F]+/;
+    print "DEBUG: getRefs with $refs\n";
     return split(/\n/, $refs);
 }
 
@@ -33,6 +34,7 @@ sub _cloneRepo {
     my $cacheDir = getSCMCacheDir . "/git";
     mkpath($cacheDir);
     my $clonePath = $cacheDir . "/" . sha256_hex($uri);
+    print "DEBUG: here with $self, $uri, $revision, $deepClone\n";
 
     my $res;
     if (! -d $clonePath) {
@@ -92,29 +94,26 @@ sub fetchInput {
     my $cachedInput;
 
     my @refs = $self->_getRefs($uri, $refPattern);
+    my $refCount = @refs;
+    my $clonePath;
+    print "DEBUG: fetchInput with $uri, $refPattern, $deepClone, $limit and refs @refs\n";
+    my $remote;
 
-    if ($refs > 1) {
-        my $i = 0;
-        while ($i <= $refs) {  
-            if ($limit == 0 || $limit le ($refs - $i)) {
-                ($revision, $ref) = split(/\s/, $_);
-                ($cachedInput) = $self->{db}->resultset('CachedGitRefInputs')->search(
-                    {uri => $uri, ref => $ref, revision => $revision},
-                    {rows => 1});
-                last if (!defined $cachedInput || !isValidPath($cachedInput->storepath));
-            }
-            ++$i;
-        }
-    } else {
-        ($revision, $ref) = split(/\s/, @refs);
+    foreach $remote (@refs) {
+      ($revision, $ref) = split(/\s+/, $remote);
+      ($cachedInput) = $self->{db}->resultset('CachedGitRefInputs')->search(
+        {uri => $uri, ref => $ref, revision => $revision},
+        {rows => 1});
+      last if (!defined $cachedInput || !isValidPath($cachedInput->storepath));
     }
 
+    print "DEBUG: fetchInput2 with $revision $refCount\n";
     if (defined $cachedInput && isValidPath($cachedInput->storepath)) {
         $storePath = $cachedInput->storepath;
         $sha256 = $cachedInput->sha256hash;
         $revision = $cachedInput->revision;
     } else {
-        my $clonePath = $self->_cloneRepo($uri, $revision, $deepClone);
+        $clonePath = $self->_cloneRepo($uri, $revision, $deepClone);
         # Then download this revision into the store.
         print STDERR "checking out Git revision $revision from $uri\n";
         $ENV{"NIX_HASH_ALGO"} = "sha256";
