@@ -18,43 +18,50 @@ sub _isHash {
     return length($rev) == 40 && $rev =~ /^[0-9a-f]+$/;
 }
 
-# Clone or update a branch of a repository into our SCM cache.
+# Return a list of refs available in a remote repository
+sub _getRefs {
+    my ($self, $uri, $refPattern) = @_;
+    my $refs = grab(cmd => ["git", "ls-remote", $uri, $refPattern]);
+    die "error fetching remote refs: $refPattern from: $uri\n" unless $refs =~ /[0-9a-fA-F]+/;
+    print "DEBUG: getRefs with $refs\n";
+    return split(/\n/, $refs);
+}
+
+# Clone or update a repository into our SCM cache.
 sub _cloneRepo {
-    my ($self, $uri, $branch, $deepClone) = @_;
+    my ($self, $uri, $revision, $deepClone) = @_;
 
     my $cacheDir = getSCMCacheDir . "/git";
     mkpath($cacheDir);
     my $clonePath = $cacheDir . "/" . sha256_hex($uri);
+    print "DEBUG: here with $self, $uri, $revision, $deepClone\n";
 
     my $res;
     if (! -d $clonePath) {
-        # Clone everything and fetch the branch.
+        # Clone everything and add remote
         $res = run(cmd => ["git", "init", $clonePath]);
         $res = run(cmd => ["git", "remote", "add", "origin", "--", $uri], dir => $clonePath) unless $res->{status};
         die "error creating git repo in `$clonePath':\n$res->{stderr}" if $res->{status};
     }
 
-    # This command forces the update of the local branch to be in the same as
-    # the remote branch for whatever the repository state is.  This command mirrors
-    # only one branch of the remote repository.
-    my $localBranch = _isHash($branch) ? "_hydra_tmp" : $branch;
-    $res = run(cmd => ["git", "fetch", "-fu", "origin", "+$branch:$localBranch"], dir => $clonePath, timeout => 600);
+    # Attempt to only fetch the revision we need, if that fails then fetch all the things.
+    $res = run(cmd => ["git", "fetch", "-fu", "origin", "+$revision"], dir => $clonePath, timeout => 600);
     $res = run(cmd => ["git", "fetch", "-fu", "origin"], dir => $clonePath, timeout => 600) if $res->{status};
     die "error fetching latest change from git repo at `$uri':\n$res->{stderr}" if $res->{status};
 
     # If deepClone is defined, then we look at the content of the repository
-    # to determine if this is a top-git branch.
+    # to determine if this is a top-git revision.
     if (defined $deepClone) {
 
-        # Is the target branch a topgit branch?
-        $res = run(cmd => ["git", "ls-tree", "-r", "$branch", ".topgit"], dir => $clonePath);
+        # Is the target revision a topgit revision?
+        $res = run(cmd => ["git", "ls-tree", "-r", "$revision", ".topgit"], dir => $clonePath);
 
         if ($res->{stdout} ne "") {
-            # Checkout the branch to look at its content.
-            $res = run(cmd => ["git", "checkout", "--force", "$branch"], dir => $clonePath);
-            die "error checking out Git branch '$branch' at `$uri':\n$res->{stderr}" if $res->{status};
+            # Checkout the revision to look at its content.
+            $res = run(cmd => ["git", "checkout", "--force", "$revision"], dir => $clonePath);
+            die "error checking out Git revision '$revision' at `$uri':\n$res->{stderr}" if $res->{status};
 
-            # This is a TopGit branch.  Fetch all the topic branches so
+            # This is a TopGit revsion.  Fetch all the topic revsiones so
             # that builders can run "tg patch" and similar.
             $res = run(cmd => ["tg", "remote", "--populate", "origin"], dir => $clonePath, timeout => 600);
             print STDERR "warning: `tg remote --populate origin' failed:\n$res->{stderr}" if $res->{status};
@@ -66,9 +73,10 @@ sub _cloneRepo {
 
 sub _parseValue {
     my ($value) = @_;
-    (my $uri, my $branch, my $deepClone) = split ' ', $value;
-    $branch = defined $branch ? $branch : "master";
-    return ($uri, $branch, $deepClone);
+    (my $uri, my $refPattern, my $deepClone, my $limit) = split ' ', $value;
+    $refPattern = defined $refPattern ? $refPattern : "refs/heads/master";
+    $limit = defined $limit ? $limit : 0;
+    return ($uri, $refPattern, $deepClone, $limit);
 }
 
 sub fetchInput {
@@ -76,33 +84,38 @@ sub fetchInput {
 
     return undef if $type ne "git";
 
-    my ($uri, $branch, $deepClone) = _parseValue($value);
-
-    my $clonePath = $self->_cloneRepo($uri, $branch, $deepClone);
+    my ($uri, $refPattern, $deepClone, $limit) = _parseValue($value);
 
     my $timestamp = time;
     my $sha256;
+    my $revision;
     my $storePath;
-
-    my $revision = _isHash($branch) ? $branch
-        : grab(cmd => ["git", "rev-parse", "$branch"], dir => $clonePath, chomp => 1);
-    die "did not get a well-formated revision number of Git branch '$branch' at `$uri'"
-        unless $revision =~ /^[0-9a-fA-F]+$/;
-
-    # Some simple caching: don't check a uri/branch/revision more than once.
-    # TODO: Fix case where the branch is reset to a previous commit.
+    my $ref;
     my $cachedInput;
-    ($cachedInput) = $self->{db}->resultset('CachedGitInputs')->search(
-        {uri => $uri, branch => $branch, revision => $revision},
-        {rows => 1});
 
+    my @refs = $self->_getRefs($uri, $refPattern);
+    my $refCount = @refs;
+    my $clonePath;
+    print "DEBUG: fetchInput with $uri, $refPattern, $deepClone, $limit and refs @refs\n";
+    my $remote;
+
+    foreach $remote (@refs) {
+      ($revision, $ref) = split(/\s+/, $remote);
+      ($cachedInput) = $self->{db}->resultset('CachedGitRefInputs')->search(
+        {uri => $uri, ref => $ref, revision => $revision},
+        {rows => 1});
+      last if (!defined $cachedInput || !isValidPath($cachedInput->storepath));
+    }
+
+    print "DEBUG: fetchInput2 with $revision $refCount\n";
     if (defined $cachedInput && isValidPath($cachedInput->storepath)) {
         $storePath = $cachedInput->storepath;
         $sha256 = $cachedInput->sha256hash;
         $revision = $cachedInput->revision;
     } else {
+        $clonePath = $self->_cloneRepo($uri, $revision, $deepClone);
         # Then download this revision into the store.
-        print STDERR "checking out Git branch $branch from $uri\n";
+        print STDERR "checking out Git revision $revision from $uri\n";
         $ENV{"NIX_HASH_ALGO"} = "sha256";
         $ENV{"PRINT_PATH"} = "1";
         $ENV{"NIX_PREFETCH_GIT_LEAVE_DOT_GIT"} = "0";
@@ -127,7 +140,7 @@ sub fetchInput {
         txn_do($self->{db}, sub {
             $self->{db}->resultset('CachedGitInputs')->update_or_create(
                 { uri => $uri
-                , branch => $branch
+                , ref => $ref
                 , revision => $revision
                 , sha256hash => $sha256
                 , storepath => $storePath
@@ -161,7 +174,7 @@ sub getCommits {
     return [] unless $rev1 =~ /^[0-9a-f]+$/;
     return [] unless $rev2 =~ /^[0-9a-f]+$/;
 
-    my ($uri, $branch, $deepClone) = _parseValue($value);
+    my ($uri, $refPattern, $deepClone, $limit) = _parseValue($value);
 
     my $clonePath = $self->_cloneRepo($uri, $branch, $deepClone);
 

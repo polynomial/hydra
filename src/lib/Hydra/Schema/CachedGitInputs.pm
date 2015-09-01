@@ -40,7 +40,7 @@ __PACKAGE__->table("CachedGitInputs");
   data_type: 'text'
   is_nullable: 0
 
-=head2 branch
+=head2 ref
 
   data_type: 'text'
   is_nullable: 0
@@ -65,7 +65,7 @@ __PACKAGE__->table("CachedGitInputs");
 __PACKAGE__->add_columns(
   "uri",
   { data_type => "text", is_nullable => 0 },
-  "branch",
+  "ref",
   { data_type => "text", is_nullable => 0 },
   "revision",
   { data_type => "text", is_nullable => 0 },
@@ -81,7 +81,7 @@ __PACKAGE__->add_columns(
 
 =item * L</uri>
 
-=item * L</branch>
+=item * L</ref>
 
 =item * L</revision>
 
@@ -89,7 +89,7 @@ __PACKAGE__->add_columns(
 
 =cut
 
-__PACKAGE__->set_primary_key("uri", "branch", "revision");
+__PACKAGE__->set_primary_key("uri", "ref", "revision");
 
 
 # Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-06-13 01:54:50
